@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO.Compression;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Linq;
+using SharpCompress.Archives;
+using SharpCompress.Common;
+using SharpCompress.Readers;
 
 namespace programToXML
 {
@@ -89,7 +91,7 @@ namespace programToXML
                             new XAttribute("sY", sY1),
                             new XAttribute("eX", eX2),
                             new XAttribute("eY", eY2),
-                           new XAttribute("kind", (int)kind),
+                            new XAttribute("kind", (int)kind),
                             new XElement("lineInfo",
                         new XAttribute("type", lineType1),
                         new XAttribute("name", lineName1),
@@ -301,21 +303,25 @@ namespace programToXML
 
                 XDocument oldXml = null;
 
+
                 if (Path.GetExtension(sourceFile).Equals(".spg", StringComparison.OrdinalIgnoreCase))
                 {
-                    using (ZipArchive archive = ZipFile.OpenRead(sourceFile))
+                    // Открываем архив с использованием SharpCompress
+                    using (var archive = ArchiveFactory.Open(sourceFile))
                     {
-                        foreach (var entry in archive.Entries)
+                        var entry = archive.Entries.FirstOrDefault(e => !e.IsDirectory);
+                        if (entry != null)
                         {
-                            if (entry.Name.Length > 0)
+                            using (var entryStream = entry.OpenEntryStream())
                             {
-                                // Читаем содержимое файла в поток
-                                using (var stream = entry.Open())
-                                {
-                                    oldXml = XDocument.Load(stream); // Загружаем XML из потока
-                                }
-                                break; // Извлекаем только первый файл
+                                // Загружаем XML из потока
+                                oldXml = XDocument.Load(entryStream);
                             }
+                        }
+                        else
+                        {
+                            MessageBox.Show("В архиве отсутствуют файлы.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
                         }
                     }
                 }
